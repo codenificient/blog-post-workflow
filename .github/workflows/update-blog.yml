@@ -1,0 +1,44 @@
+name: Update GitHub Profile README with Latest Hashnode Posts
+
+on:
+  schedule:
+    - cron: '0 15 * * 0' # Every Sunday at 3 PM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    env:
+      HASHNODE_API_KEY: ${{ secrets.HASHNODE_API_KEY }}
+
+    steps:
+      - name: Checkout this repo (blog-fetcher)
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Clone GitHub profile repo
+        run: |
+          git clone https://x-access-token:${{ secrets.PAT_1 }}@github.com/codenificient/codenificient.git profile-repo
+
+      - name: Run update script
+        run: node update-readme.js
+
+      - name: Commit and push changes to profile repo
+        working-directory: ./profile-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update README with latest Hashnode blog posts" || echo "No changes to commit"
+          git push
