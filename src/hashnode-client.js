@@ -81,7 +81,7 @@ class HashnodeClient {
             // Transform Hashnode posts to match the expected format
             return posts.slice(0, maxPosts).map(post => ({
                 title: post.title,
-                url: `https://hashnode.com/${post.slug}`,
+                url: post.url ?? `https://codenificient.hashnode.dev/${post.slug}`,
                 description: post.brief || '',
                 date: new Date(post.publishedAt),
                 categories: post.tags ? post.tags.map(tag => tag.name) : [],
