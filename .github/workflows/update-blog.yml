@@ -32,7 +32,7 @@ jobs:
           git clone https://x-access-token:${{ secrets.PAT_1 }}@github.com/codenificient/codenificient.git profile-repo
 
       - name: Run update script
-        run: node update-readme.js
+        run: node src/update-readme.js
 
       - name: Commit and push changes to profile repo
         working-directory: ./profile-repo
