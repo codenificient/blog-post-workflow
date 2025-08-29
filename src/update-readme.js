@@ -20,7 +20,7 @@ const END_MARKER = '<!-- BLOG-POST-LIST:END -->';
     }
 
     const client = new HashnodeClient(apiKey);
-    const posts = await client.fetchPostsByPublication(PUBLICATION_DOMAIN, MAX_POSTS);
+    const posts = await client.fetchPosts(PUBLICATION_DOMAIN, MAX_POSTS);
 
     if (!posts.length) {
       core.warning('No blog posts found');
