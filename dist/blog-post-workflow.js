@@ -34297,7 +34297,7 @@ var require_hashnode_client = __commonJS({
     var HashnodeClient2 = class {
       constructor(apiKey) {
         this.apiKey = apiKey;
-        this.endpoint = "https://api.hashnode.com/";
+        this.endpoint = "https://gql.hashnode.com";
       }
       /**
        * Fetch blog posts for a specific GitHub username

@@ -33,7 +33,7 @@ name: Update README with Hashnode Posts
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
+    - cron: '0 15 * * 0'  # Daily at midnight
   workflow_dispatch:      # Manual trigger
 
 jobs:
@@ -46,11 +46,11 @@ jobs:
         uses: ./
         with:
           hashnode_api_key: ${{ secrets.HASHNODE_API_KEY }}
-          github_username: 'your-github-username'
+          github_username: 'codenificient'
           max_post_count: '5'
           template: 'default'
           readme_path: './README.md'
-          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          gh_token: ${{ secrets.PAT_1 }}
 ```
 
 ### 3. Add GitHub Secrets

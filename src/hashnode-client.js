@@ -7,7 +7,7 @@ const fetch = require('node-fetch');
 class HashnodeClient {
     constructor(apiKey) {
         this.apiKey = apiKey;
-        this.endpoint = 'https://api.hashnode.com/';
+        this.endpoint = 'https://gql.hashnode.com';
     }
 
     /**
