@@ -4,8 +4,8 @@ const core = require('@actions/core');
 const HashnodeClient = require('./hashnode-client'); // Adjust if your file is named differently
 
 // === Config ===
-const PUBLICATION_DOMAIN = 'blog.tioye.dev'; // your Hashnode custom domain
-const MAX_POSTS = 5;
+const PUBLICATION_DOMAIN = 'codenificient.hashnode.dev'; // your Hashnode custom domain
+const MAX_POSTS = 6;
 const README_PATH = path.join(__dirname, 'profile-repo', 'README.md');
 const START_MARKER = '<!-- BLOG-POST-LIST:START -->';
 const END_MARKER = '<!-- BLOG-POST-LIST:END -->';
@@ -18,7 +18,7 @@ const END_MARKER = '<!-- BLOG-POST-LIST:END -->';
     }
 
     const client = new HashnodeClient(apiKey);
-    const posts = await client.fetchPostsByPublication(PUBLICATION_DOMAIN, MAX_POSTS);
+    const posts = await client.fetchPosts(PUBLICATION_DOMAIN, MAX_POSTS);
 
     if (!posts.length) {
       core.warning('No blog posts found');
