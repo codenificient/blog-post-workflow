@@ -1,0 +1,47 @@
+name: Update README with Hashnode Posts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  workflow_dispatch:      # Manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - 'README.md'
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update README with Hashnode Posts
+        uses: ./
+        with:
+          # Hashnode GraphQL API configuration
+          hashnode_api_key: ${{ secrets.HASHNODE_API_KEY }}
+          github_username: 'your-github-username'  # Replace with your actual GitHub username
+          
+          # Blog post configuration
+          max_post_count: '5'
+          template: 'default'
+          date_format: 'UTC:ddd mmm dd yyyy'
+          
+          # README configuration
+          readme_path: './README.md'
+          commit_message: '📝 Update README with latest Hashnode posts'
+          
+          # GitHub configuration
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          committer_username: 'blog-post-bot'
+          committer_email: 'blog-post-bot@example.com'
+          
+          # Optional: Advanced features
+          disable_sort: 'false'
+          sort_order: 'desc'
+          remove_duplicates: 'true'
+          disable_html_encoding: 'false'

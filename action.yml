@@ -15,10 +15,18 @@ inputs:
     description: 'Maximum number of posts you want to show on your readme, all feeds combined'
     default: '5'
     required: false
+  # Hashnode GraphQL API inputs
+  hashnode_api_key:
+    description: 'Hashnode API key for GraphQL access'
+    required: false
+  github_username:
+    description: 'GitHub username to fetch Hashnode posts for'
+    required: false
+  # Legacy RSS inputs (kept for backward compatibility)
   feed_list:
-    description: "Comma separated list of RSS feed urls"
+    description: "Comma separated list of RSS feed urls (legacy, use hashnode_api_key + github_username for Hashnode)"
     default: ""
-    required: true
+    required: false
   disable_sort:
     description: "Disables the sorting of list based on publish date"
     default: "false"

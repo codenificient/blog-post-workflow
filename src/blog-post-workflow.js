@@ -6,6 +6,7 @@ const dateFormat = require('dateformat');
 const rand = require('random-seed');
 const promiseRetry = require('promise-retry');
 const keepaliveWorkflow = require('keepalive-workflow');
+const HashnodeClient = require('./hashnode-client');
 const {
 	updateAndParseCompoundParams,
 	commitReadme,
@@ -30,6 +31,10 @@ const acceptHeader = core.getInput('accept_header');
 
 // Total no of posts to display on readme, all sources combined, default: 5
 const TOTAL_POST_COUNT = Number.parseInt(core.getInput('max_post_count'));
+
+// Hashnode GraphQL API inputs
+const HASHNODE_API_KEY = core.getInput('hashnode_api_key');
+const GITHUB_USERNAME = core.getInput('github_username');
 
 // Disables sort
 const ENABLE_SORT = core.getInput('disable_sort') === 'false';
@@ -78,6 +83,9 @@ const retryConfig = {
 };
 
 core.setSecret(GITHUB_TOKEN);
+if (HASHNODE_API_KEY) {
+	core.setSecret(HASHNODE_API_KEY);
+}
 
 for (let item of core.getInput('custom_tags').trim().split(',')) {
 	item = item.trim();
@@ -89,155 +97,216 @@ const runnerNameArray = []; // To show the error/success message
 let postsArray = []; // Array to store posts
 let jobFailFlag = false; // Job status flag
 
-const feedObjString = core.getInput('feed_list').trim();
+// Check if we should use Hashnode GraphQL API
+const useHashnode = HASHNODE_API_KEY && GITHUB_USERNAME;
 
-// Reading feed list from the workflow input
-const feedList = feedObjString.split(',').map((item) => item.trim());
-if (feedList.length === 0) {
-	core.error('Please double check the value of feed_list');
-	process.exit(1);
-}
+if (!useHashnode) {
+	// Legacy RSS feed handling
+	const feedObjString = core.getInput('feed_list').trim();
+	
+	// Reading feed list from the workflow input
+	const feedList = feedObjString.split(',').map((item) => item.trim());
+	if (feedList.length === 0) {
+		core.error('Please provide either hashnode_api_key + github_username OR feed_list');
+		process.exit(1);
+	}
 
-// Grabbing feed names and converting it into array
-const feedNames = core.getInput('feed_names').trim();
-const feedNamesList = feedNames.split(',').map((item) => item.trim());
+	// Grabbing feed names and converting it into array
+	const feedNames = core.getInput('feed_names').trim();
+	const feedNamesList = feedNames.split(',').map((item) => item.trim());
 
-const customTagArgs = Object.keys(CUSTOM_TAGS).map((item) => [CUSTOM_TAGS[item], item]);
+	const customTagArgs = Object.keys(CUSTOM_TAGS).map((item) => [CUSTOM_TAGS[item], item]);
 
-const parser = new Parser({
-	headers: {
-		'User-Agent': userAgent,
-		Accept: acceptHeader,
-	},
-	customFields: {
-		item: [...customTagArgs],
-	},
-});
+	const parser = new Parser({
+		headers: {
+			'User-Agent': userAgent,
+			Accept: acceptHeader,
+		},
+		customFields: {
+			item: [...customTagArgs],
+		},
+	});
 
-// Generating promise array
-for (const siteUrl of feedList) {
-	runnerNameArray.push(siteUrl);
-	promiseArray.push(
-		new Promise((resolve, reject) => {
-			promiseRetry((retry, tryNumber) => {
-				// Retry block
-				if (tryNumber > 1) {
-					core.info(`Previous try for ${siteUrl} failed, retrying: ${tryNumber - 1}`);
-				}
-				return parser.parseURL(siteUrl).catch(retry);
-			}, retryConfig).then(
-				(data) => {
-					if (!data.items) {
-						reject('Cannot read response->item');
-					} else {
-						const responsePosts = data.items;
-						// To handle duplicate filter
-						const appendedPostTitles = [];
-						const appendedPostDesc = [];
-						const posts = responsePosts
-							.filter(ignoreStackOverflowComments)
-							.filter(ignoreStackExchangeComments)
-							.filter(dateFilter)
-							.map((item) => {
-								// Validating keys to avoid errors
-								if (ENABLE_SORT && ENABLE_VALIDATION && !item.pubDate) {
-									reject('Cannot read response->item->pubDate');
-								}
-
-								// Handle missing titles gracefully
-								if (ENABLE_VALIDATION && !item.title) {
-									// Either skip the item by returning null
-									// or use a fallback title (from URL or a default value)
-									core.warning(`Missing title for item with link: ${item.link || 'unknown'}`);
-									if (core.getInput('skip_items_without_title') === 'true') {
-										return null; // This item will be filtered out later
-									}
-									// Use URL as fallback or a default text
-									item.title = item.link
-										? `[No Title] - ${item.link.split('/').pop() || 'Post'}`
-										: 'Post without title';
-								}
-
-								if (ENABLE_VALIDATION && !item.link) {
-									reject('Cannot read response->item->link');
-								}
-								// Custom tags
-								const customTags = {};
-								for (const tag of Object.keys(CUSTOM_TAGS)) {
-									if (item[tag]) {
-										Object.assign(customTags, { [tag]: item[tag] });
-									}
-								}
-								const categories = item.categories ? categoriesToArray(item.categories) : [];
-								let post = {
-									title: item.title ? item.title.trim() : item.title, // Handle null safely
-									url: item.link.trim(),
-									description: item.content ? item.content : '',
-									...customTags,
-									categories,
-								};
-
-								if (ENABLE_SORT) {
-									post.date = new Date(item.pubDate.trim());
-								}
-
-								if (TITLE_MAX_LENGTH && post && post.title) {
-									// Trimming the title
-									post.title = truncateString(post.title, TITLE_MAX_LENGTH);
-								}
-
-								if (DESCRIPTION_MAX_LENGTH && post && post.description) {
-									// Trimming the description
-									post.description = truncateString(post.description, DESCRIPTION_MAX_LENGTH);
-								}
-
-								// Advanced content manipulation using javascript code
-								if (ITEM_EXEC) {
-									try {
-										// biome-ignore lint/security/noGlobalEval: its needed here
-										eval(ITEM_EXEC);
-									} catch (e) {
-										core.error('Failure in executing `item_exec` parameter');
-										core.error(e);
-										process.exit(1);
-									}
-								}
-								if (post && core.getInput('remove_duplicates') === 'true') {
-									if (
-										appendedPostTitles.indexOf(post.title.trim()) !== -1 ||
-										appendedPostDesc.indexOf(post.description.trim()) !== -1
-									) {
-										post = null;
-									} else {
-										if (post.title) {
-											appendedPostTitles.push(post.title.trim());
-										}
-										if (post.description) {
-											appendedPostDesc.push(post.description.trim());
-										}
-									}
-								}
-
-								// Doing HTML encoding at last ref: #117
-								const disableHtmlEncoding = core.getInput('disable_html_encoding') !== 'false';
-								if (!disableHtmlEncoding && post) {
-									for (const key of Object.keys(post)) {
-										if (typeof post[key] === 'string' && key !== 'url') {
-											post[key] = escapeHTML(post[key]);
-										}
-									}
-								}
-								return post;
-							});
-						resolve(posts);
+	// Generating promise array for RSS feeds
+	for (const siteUrl of feedList) {
+		runnerNameArray.push(siteUrl);
+		promiseArray.push(
+			new Promise((resolve, reject) => {
+				promiseRetry((retry, tryNumber) => {
+					// Retry block
+					if (tryNumber > 1) {
+						core.info(`Previous try for ${siteUrl} failed, retrying: ${tryNumber - 1}`);
 					}
-				},
-				(err) => {
-					reject(err);
-				},
-			);
-		}),
+					return parser.parseURL(siteUrl).catch(retry);
+				}, retryConfig).then(
+					(data) => {
+						if (!data.items) {
+							reject('Cannot read response->item');
+						} else {
+							const responsePosts = data.items;
+							// To handle duplicate filter
+							const appendedPostTitles = [];
+							const appendedPostDesc = [];
+							const posts = responsePosts
+								.filter(ignoreStackOverflowComments)
+								.filter(ignoreStackExchangeComments)
+								.filter(dateFilter)
+								.map((item) => {
+									// Validating keys to avoid errors
+									if (ENABLE_SORT && ENABLE_VALIDATION && !item.pubDate) {
+										reject('Cannot read response->item->pubDate');
+									}
+
+									// Handle missing titles gracefully
+									if (ENABLE_VALIDATION && !item.title) {
+										// Either skip the item by returning null
+										// or use a fallback title (from URL or a default value)
+										core.warning(`Missing title for item with link: ${item.link || 'unknown'}`);
+										if (core.getInput('skip_items_without_title') === 'true') {
+											return null; // This item will be filtered out later
+										}
+										// Use URL as fallback or a default text
+										item.title = item.link
+											? `[No Title] - ${item.link.split('/').pop() || 'Post'}`
+											: 'Post without title';
+									}
+
+									if (ENABLE_VALIDATION && !item.link) {
+										reject('Cannot read response->item->link');
+									}
+									// Custom tags
+									const customTags = {};
+									for (const tag of Object.keys(CUSTOM_TAGS)) {
+										if (item[tag]) {
+											Object.assign(customTags, { [tag]: item[tag] });
+										}
+									}
+									const categories = item.categories ? categoriesToArray(item.categories) : [];
+									let post = {
+										title: item.title ? item.title.trim() : item.title, // Handle null safely
+										url: item.link.trim(),
+										description: item.content ? item.content : '',
+										...customTags,
+										categories,
+									};
+
+									if (ENABLE_SORT) {
+										post.date = new Date(item.pubDate.trim());
+									}
+
+									if (TITLE_MAX_LENGTH && post && post.title) {
+										// Trimming the title
+										post.title = truncateString(post.title, TITLE_MAX_LENGTH);
+									}
+
+									if (DESCRIPTION_MAX_LENGTH && post && post.description) {
+										// Trimming the description
+										post.description = truncateString(post.description, DESCRIPTION_MAX_LENGTH);
+									}
+
+									// Advanced content manipulation using javascript code
+									if (ITEM_EXEC) {
+										try {
+											// biome-ignore lint/security/noGlobalEval: its needed here
+											eval(ITEM_EXEC);
+										} catch (e) {
+											core.error('Failure in executing `item_exec` parameter');
+											core.error(e);
+											process.exit(1);
+										}
+									}
+									if (post && core.getInput('remove_duplicates') === 'true') {
+										if (
+											appendedPostTitles.indexOf(post.title.trim()) !== -1 ||
+											appendedPostDesc.indexOf(post.description.trim()) !== -1
+										) {
+											post = null;
+										} else {
+											if (post.title) {
+												appendedPostTitles.push(post.title.trim());
+											}
+											if (post.description) {
+												appendedPostDesc.push(post.description.trim());
+											}
+										}
+									}
+
+									// Doing HTML encoding at last ref: #117
+									const disableHtmlEncoding = core.getInput('disable_html_encoding') !== 'false';
+									if (!disableHtmlEncoding && post) {
+										for (const key of Object.keys(post)) {
+											if (typeof post[key] === 'string' && key !== 'url') {
+												post[key] = escapeHTML(post[key]);
+											}
+										}
+									}
+									return post;
+								});
+							resolve(posts);
+						}
+					},
+					(err) => {
+						reject(err);
+					},
+				);
+			}),
+		);
+	}
+} else {
+	// Hashnode GraphQL API handling
+	core.info(`Using Hashnode GraphQL API for GitHub username: ${GITHUB_USERNAME}`);
+	
+	const hashnodeClient = new HashnodeClient(HASHNODE_API_KEY);
+	
+	promiseArray.push(
+		new Promise(async (resolve, reject) => {
+			try {
+				const posts = await hashnodeClient.fetchPosts(GITHUB_USERNAME, TOTAL_POST_COUNT);
+				
+				// Apply the same processing as RSS posts
+				const processedPosts = posts.map((post) => {
+					// Apply title and description trimming
+					if (TITLE_MAX_LENGTH && post.title) {
+						post.title = truncateString(post.title, TITLE_MAX_LENGTH);
+					}
+					
+					if (DESCRIPTION_MAX_LENGTH && post.description) {
+						post.description = truncateString(post.description, DESCRIPTION_MAX_LENGTH);
+					}
+					
+					// Advanced content manipulation using javascript code
+					if (ITEM_EXEC) {
+						try {
+							// biome-ignore lint/security/noGlobalEval: its needed here
+							eval(ITEM_EXEC);
+						} catch (e) {
+							core.error('Failure in executing `item_exec` parameter');
+							core.error(e);
+							process.exit(1);
+						}
+					}
+					
+					// HTML encoding
+					const disableHtmlEncoding = core.getInput('disable_html_encoding') !== 'false';
+					if (!disableHtmlEncoding) {
+						for (const key of Object.keys(post)) {
+							if (typeof post[key] === 'string' && key !== 'url') {
+								post[key] = escapeHTML(post[key]);
+							}
+						}
+					}
+					
+					return post;
+				});
+				
+				resolve(processedPosts);
+			} catch (error) {
+				reject(error);
+			}
+		})
 	);
+	
+	runnerNameArray.push(`Hashnode GraphQL API (${GITHUB_USERNAME})`);
 }
 
 const runWorkflow = async () => {

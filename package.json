@@ -36,6 +36,7 @@
     "dateformat": "^3.0.3",
     "esbuild": "^0.25.2",
     "keepalive-workflow": "^2.0.9",
+    "node-fetch": "^2.7.0",
     "process": "latest",
     "promise-retry": "^2.0.1",
     "random-seed": "^0.3.0",
