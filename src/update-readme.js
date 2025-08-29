@@ -1,12 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const core = require('@actions/core');
-const HashnodeClient = require('./hashnode-client'); // Adjust if your file is named differently
+const HashnodeClient = require('./hashnode-client');
 
-// === Config ===
-const PUBLICATION_DOMAIN = 'codenificient.hashnode.dev'; // your Hashnode custom domain
-const MAX_POSTS = 6;
-const README_PATH = path.join(__dirname, 'profile-repo', 'README.md');
+const PUBLICATION_DOMAIN = 'codenificient.hashnode.dev';
+const MAX_POSTS = 5;
+
+// FIXED LINE HERE 👇
+const README_PATH = path.resolve(__dirname, '../profile-repo/README.md');
+
 const START_MARKER = '<!-- BLOG-POST-LIST:START -->';
 const END_MARKER = '<!-- BLOG-POST-LIST:END -->';
 
@@ -18,14 +20,13 @@ const END_MARKER = '<!-- BLOG-POST-LIST:END -->';
     }
 
     const client = new HashnodeClient(apiKey);
-    const posts = await client.fetchPosts(PUBLICATION_DOMAIN, MAX_POSTS);
+    const posts = await client.fetchPostsByPublication(PUBLICATION_DOMAIN, MAX_POSTS);
 
     if (!posts.length) {
       core.warning('No blog posts found');
       return;
     }
 
-    // Format posts as Markdown
     const formattedPosts = posts.map(post => {
       const date = post.date.toISOString().split('T')[0];
       return `- [${post.title}](${post.url}) _(Published: ${date})_`;
