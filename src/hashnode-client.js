@@ -27,6 +27,7 @@ class HashnodeClient {
                                 node {
                                     title
                                     slug
+                                    url
                                     brief
                                     publishedAt
                                     tags {
