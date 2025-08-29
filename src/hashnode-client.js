@@ -18,21 +18,25 @@ class HashnodeClient {
      */
     async fetchPosts(githubUsername, maxPosts = 5) {
         try {
+            // Try to fetch posts using the publication query with correct schema
             const query = `
-                query GetUserArticles($username: String!, $limit: Int!) {
-                    user(username: $username) {
-                        publication {
-                            posts(page: 0, limit: $limit) {
-                                title
-                                slug
-                                brief
-                                dateAdded
-                                tags {
-                                    name
+                query GetPublicationArticles($host: String!, $first: Int!) {
+                    publication(host: $host) {
+                        posts(first: $first) {
+                            edges {
+                                node {
+                                    title
+                                    slug
+                                    brief
+                                    publishedAt
+                                    tags {
+                                        name
+                                    }
+                                    coverImage {
+                                        url
+                                    }
+                                    responseCount
                                 }
-                                coverImage
-                                totalReactions
-                                responseCount
                             }
                         }
                     }
@@ -40,8 +44,8 @@ class HashnodeClient {
             `;
 
             const variables = {
-                username: githubUsername,
-                limit: Math.max(maxPosts, 10) // Fetch a bit more to account for filtering
+                host: githubUsername,
+                first: Math.max(maxPosts, 10) // Fetch a bit more to account for filtering
             };
 
             const response = await fetch(this.endpoint, {
@@ -66,23 +70,23 @@ class HashnodeClient {
                 throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
             }
 
-            if (!data.data?.user?.publication?.posts) {
-                core.warning(`No posts found for GitHub username: ${githubUsername}`);
+            if (!data.data?.publication?.posts?.edges) {
+                core.warning(`No posts found for publication host: ${githubUsername}`);
                 return [];
             }
 
-            const posts = data.data.user.publication.posts;
+            const posts = data.data.publication.posts.edges.map(edge => edge.node);
             
             // Transform Hashnode posts to match the expected format
             return posts.slice(0, maxPosts).map(post => ({
                 title: post.title,
                 url: `https://hashnode.com/${post.slug}`,
                 description: post.brief || '',
-                date: new Date(post.dateAdded),
+                date: new Date(post.publishedAt),
                 categories: post.tags ? post.tags.map(tag => tag.name) : [],
-                coverImage: post.coverImage,
-                totalReactions: post.totalReactions,
-                responseCount: post.responseCount
+                coverImage: post.coverImage?.url || '',
+                totalReactions: 0, // Not available in current schema
+                responseCount: post.responseCount || 0
             }));
 
         } catch (error) {

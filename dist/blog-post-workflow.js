@@ -34308,28 +34308,31 @@ var require_hashnode_client = __commonJS({
       async fetchPosts(githubUsername, maxPosts = 5) {
         try {
           const query = `
-                query GetUserArticles($username: String!, $limit: Int!) {
-                    user(username: $username) {
-                        publication {
-                            posts(page: 0, limit: $limit) {
-                                title
-                                slug
-                                brief
-                                dateAdded
-                                tags {
-                                    name
+                query GetPublicationArticles($host: String!, $first: Int!) {
+                    publication(host: $host) {
+                        posts(first: $first) {
+                            edges {
+                                node {
+                                    title
+                                    slug
+                                    brief
+                                    publishedAt
+                                    tags {
+                                        name
+                                    }
+                                    coverImage {
+                                        url
+                                    }
+                                    responseCount
                                 }
-                                coverImage
-                                totalReactions
-                                responseCount
                             }
                         }
                     }
                 }
             `;
           const variables = {
-            username: githubUsername,
-            limit: Math.max(maxPosts, 10)
+            host: githubUsername,
+            first: Math.max(maxPosts, 10)
             // Fetch a bit more to account for filtering
           };
           const response = await fetch(this.endpoint, {
@@ -34350,20 +34353,21 @@ var require_hashnode_client = __commonJS({
           if (data2.errors) {
             throw new Error(`GraphQL errors: ${JSON.stringify(data2.errors)}`);
           }
-          if (!data2.data?.user?.publication?.posts) {
-            core2.warning(`No posts found for GitHub username: ${githubUsername}`);
+          if (!data2.data?.publication?.posts?.edges) {
+            core2.warning(`No posts found for publication host: ${githubUsername}`);
             return [];
           }
-          const posts2 = data2.data.user.publication.posts;
+          const posts2 = data2.data.publication.posts.edges.map((edge) => edge.node);
           return posts2.slice(0, maxPosts).map((post2) => ({
             title: post2.title,
             url: `https://hashnode.com/${post2.slug}`,
             description: post2.brief || "",
-            date: new Date(post2.dateAdded),
+            date: new Date(post2.publishedAt),
             categories: post2.tags ? post2.tags.map((tag) => tag.name) : [],
-            coverImage: post2.coverImage,
-            totalReactions: post2.totalReactions,
-            responseCount: post2.responseCount
+            coverImage: post2.coverImage?.url || "",
+            totalReactions: 0,
+            // Not available in current schema
+            responseCount: post2.responseCount || 0
           }));
         } catch (error) {
           core2.error(`Failed to fetch Hashnode posts: ${error.message}`);
