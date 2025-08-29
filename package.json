@@ -13,7 +13,9 @@
     "test-run": "mocha --parallel --reporter json --reporter-option output=src-report.json --jobs 100 test/**.js",
     "test": "yarn run lint && start-server-and-test start-server http://localhost:8080 test-run",
     "test-run-dist": "DIST=true mocha --parallel --reporter json --reporter-option output=dist-report.json --jobs 100 test/**.js",
-    "test-dist": "yarn run lint && start-server-and-test start-server http://localhost:8080 test-run-dist"
+    "test-dist": "yarn run lint && start-server-and-test start-server http://localhost:8080 test-run-dist",
+    "test:hashnode": "node test-hashnode.js",
+    "test:hashnode:quick": "node quick-test.js"
   },
   "repository": {
     "type": "git",
