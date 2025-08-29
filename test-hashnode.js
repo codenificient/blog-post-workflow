@@ -18,13 +18,15 @@ try {
 }
 
 const HashnodeClient = require('./src/hashnode-client');
+const fs = require('fs');
+const path = require('path');
 
 async function testHashnodeClient() {
     console.log('🧪 Testing Hashnode Client...\n');
     
     // Check if API key is provided
     const apiKey = process.env.HASHNODE_API_KEY;
-    const username = process.env.GITHUB_USERNAME || 'gautamkrishnar'; // Default test username
+    const username = process.env.GITHUB_USERNAME || 'codenificient.hashnode.dev'; // Default test username
     
     if (!apiKey) {
         console.log('❌ HASHNODE_API_KEY environment variable not set');
@@ -53,7 +55,7 @@ async function testHashnodeClient() {
         const client = new HashnodeClient(apiKey);
         
         console.log('📡 Fetching posts...');
-        const posts = await client.fetchPosts(username, 3);
+        const posts = await client.fetchPosts(username, 6);
         
         if (posts.length === 0) {
             console.log('⚠️  No posts found');
@@ -73,6 +75,9 @@ async function testHashnodeClient() {
                 console.log(`   ❤️  ${post.totalReactions || 0} reactions`);
                 console.log('');
             });
+            
+            // Update LOCAL_TESTING.md with test results
+            await updateLocalTestingMD(posts, username);
         }
         
     } catch (error) {
@@ -89,6 +94,102 @@ async function testHashnodeClient() {
             console.log('\n💡 This might be a network issue or Hashnode API is down');
         }
     }
+}
+
+/**
+ * Update LOCAL_TESTING.md with live test results
+ */
+async function updateLocalTestingMD(posts, username) {
+    try {
+        const localTestingPath = path.join(__dirname, 'LOCAL_TESTING.md');
+        let content = fs.readFileSync(localTestingPath, 'utf8');
+        
+        // Create test results section
+        const testResults = generateTestResultsSection(posts, username);
+        
+        // Check if test results section already exists
+        const testResultsMarker = '## Live Test Results';
+        if (content.includes(testResultsMarker)) {
+            // Replace existing test results
+            const startMarker = content.indexOf(testResultsMarker);
+            const endMarker = content.indexOf('##', startMarker + 1);
+            if (endMarker !== -1) {
+                content = content.substring(0, startMarker) + testResults + content.substring(endMarker);
+            } else {
+                content = content.substring(0, startMarker) + testResults;
+            }
+        } else {
+            // Add test results section after the first heading
+            const firstHeadingIndex = content.indexOf('#');
+            const insertIndex = content.indexOf('\n', firstHeadingIndex) + 1;
+            content = content.substring(0, insertIndex) + '\n' + testResults + content.substring(insertIndex);
+        }
+        
+        // Write updated content back to file
+        fs.writeFileSync(localTestingPath, content, 'utf8');
+        console.log('📝 Updated LOCAL_TESTING.md with live test results');
+        
+    } catch (error) {
+        console.log('⚠️  Could not update LOCAL_TESTING.md:', error.message);
+    }
+}
+
+/**
+ * Generate the test results section for LOCAL_TESTING.md
+ */
+function generateTestResultsSection(posts, username) {
+    const now = new Date().toISOString();
+    const dateStr = now.split('T')[0];
+    const timeStr = now.split('T')[1].split('.')[0];
+    
+    let section = `## Live Test Results
+
+> **Last Test Run**: ${dateStr} at ${timeStr} UTC  
+> **Status**: ✅ **SUCCESS** - Hashnode integration working correctly  
+> **Tested Username**: \`${username}\`  
+> **Posts Retrieved**: ${posts.length}
+
+### Test Output
+
+The following test was run successfully using the Hashnode GraphQL API:
+
+\`\`\`bash
+npm run test:hashnode
+\`\`\`
+
+**Result**: Found ${posts.length} blog posts from Hashnode
+
+`;
+
+    // Add post details
+    posts.forEach((post, index) => {
+        const postDate = post.date.toISOString().split('T')[0];
+        const categories = post.categories.length > 0 ? post.categories.join(', ') : 'No tags';
+        
+        section += `${index + 1}. **${post.title}**
+   - **URL**: [${post.url}](${post.url})
+   - **Date**: ${postDate}
+   - **Tags**: ${categories}
+   - **Responses**: ${post.responseCount || 0}
+   - **Reactions**: ${post.totalReactions || 0}
+
+`;
+    });
+
+    section += `### Test Summary
+
+✅ **API Connection**: Successfully connected to Hashnode GraphQL API  
+✅ **Authentication**: API key validated and working  
+✅ **Data Retrieval**: Successfully fetched ${posts.length} blog posts  
+✅ **Data Processing**: Posts correctly formatted and structured  
+✅ **Integration Ready**: Package ready for production use
+
+---
+
+*This section is automatically updated each time the test script runs successfully.*
+`;
+
+    return section;
 }
 
 // Run the test

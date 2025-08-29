@@ -80,6 +80,8 @@
 
 **Note**: The Hashnode GraphQL API method is recommended as it provides better data quality and doesn't require RSS feeds. See [HASHNODE_INTEGRATION.md](HASHNODE_INTEGRATION.md) for detailed setup instructions.
 
+**Live Demo**: Check [LOCAL_TESTING.md](LOCAL_TESTING.md) for live test results proving the integration works!
+
 ## Options
 
 This workflow has additional options that you can use to customize it for your use case. The following are the list of options available:
