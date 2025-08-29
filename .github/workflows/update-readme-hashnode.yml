@@ -2,7 +2,7 @@ name: Update README with Hashnode Posts
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Daily at midnight UTC
+    - cron: '0 15 * * 0'  # 3pm on Sundays
   workflow_dispatch:      # Manual trigger
   push:
     branches:
@@ -17,14 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_1 }}
       
       - name: Update README with Hashnode Posts
         uses: ./
         with:
           # Hashnode GraphQL API configuration
           hashnode_api_key: ${{ secrets.HASHNODE_API_KEY }}
-          github_username: 'your-github-username'  # Replace with your actual GitHub username
+          github_username: 'codenificient'  # Replace with your actual GitHub username
           
           # Blog post configuration
           max_post_count: '5'
