@@ -24,6 +24,20 @@ const {
 	dateFilter,
 } = require('./filters');
 const path = require('node:path');
+const vm = require('node:vm');
+
+/**
+ * Safely executes user-provided code in a sandboxed context
+ * @param {string} code - The code to execute
+ * @param {object} post - The post object to expose to the sandbox
+ * @returns {object} The modified post object
+ */
+function executeInSandbox(code, post) {
+	const sandbox = { post };
+	vm.createContext(sandbox);
+	vm.runInContext(code, sandbox, { timeout: 1000 });
+	return sandbox.post;
+}
 
 // Blog workflow code
 const userAgent = core.getInput('user_agent');
@@ -207,8 +221,7 @@ if (!useHashnode) {
 									// Advanced content manipulation using javascript code
 									if (ITEM_EXEC) {
 										try {
-											// biome-ignore lint/security/noGlobalEval: its needed here
-											eval(ITEM_EXEC);
+											post = executeInSandbox(ITEM_EXEC, post);
 										} catch (e) {
 											core.error('Failure in executing `item_exec` parameter');
 											core.error(e);
@@ -277,8 +290,7 @@ if (!useHashnode) {
 					// Advanced content manipulation using javascript code
 					if (ITEM_EXEC) {
 						try {
-							// biome-ignore lint/security/noGlobalEval: its needed here
-							eval(ITEM_EXEC);
+							post = executeInSandbox(ITEM_EXEC, post);
 						} catch (e) {
 							core.error('Failure in executing `item_exec` parameter');
 							core.error(e);
