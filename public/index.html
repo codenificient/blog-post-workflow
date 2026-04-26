@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="dark light" />
+		<title>Blog Post Workflow — Latest blog posts in your README</title>
+		<meta
+			name="description"
+			content="A GitHub Action that pulls your latest Hashnode (or RSS) blog posts straight into your README. Live demo, customizable count, copy-paste markdown."
+		/>
+		<link
+			rel="icon"
+			href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E"
+		/>
+		<script>
+			(function () {
+				try {
+					var stored = localStorage.getItem("theme");
+					var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+					var theme = stored || (systemDark ? "dark" : "light");
+					document.documentElement.dataset.theme = theme;
+				} catch (e) {
+					document.documentElement.dataset.theme = "dark";
+				}
+			})();
+		</script>
+		<style>
+			:root, :root[data-theme="dark"] {
+				--bg: #0d1117;
+				--bg-elev: #161b22;
+				--bg-elev-2: #1c2128;
+				--border: #30363d;
+				--border-strong: #444c56;
+				--text: #e6edf3;
+				--text-muted: #8b949e;
+				--accent: #2f81f7;
+				--accent-2: #f778ba;
+				--accent-glow: rgba(47, 129, 247, 0.32);
+				--success: #3fb950;
+				--radius: 10px;
+				--font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+				--mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+			}
+			:root[data-theme="light"] {
+				--bg: #ffffff;
+				--bg-elev: #f6f8fa;
+				--bg-elev-2: #eaeef2;
+				--border: #d0d7de;
+				--border-strong: #afb8c1;
+				--text: #1f2328;
+				--text-muted: #59636e;
+				--accent: #0969da;
+				--accent-2: #bf3989;
+				--accent-glow: rgba(9, 105, 218, 0.22);
+			}
+			* { box-sizing: border-box; }
+			html, body { margin: 0; padding: 0; }
+			body {
+				font-family: var(--font);
+				background: var(--bg);
+				color: var(--text);
+				line-height: 1.55;
+				-webkit-font-smoothing: antialiased;
+				min-height: 100vh;
+				background-image:
+					radial-gradient(800px 400px at 80% -10%, var(--accent-glow), transparent 70%),
+					radial-gradient(700px 400px at -10% 10%, rgba(247, 120, 186, 0.18), transparent 70%);
+			}
+			a { color: var(--accent); text-decoration: none; }
+			a:hover { text-decoration: underline; }
+
+			.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+			header.site {
+				display: flex; align-items: center; justify-content: space-between;
+				padding: 18px 0; border-bottom: 1px solid var(--border);
+				backdrop-filter: blur(8px);
+			}
+			.logo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+			.logo .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 12px var(--accent-glow); }
+			nav.site { display: flex; gap: 18px; align-items: center; font-size: 14px; color: var(--text-muted); }
+			nav.site a { color: var(--text-muted); }
+			nav.site a:hover { color: var(--text); }
+			.theme-toggle {
+				background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+				width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+				cursor: pointer; padding: 0;
+			}
+			.theme-toggle:hover { border-color: var(--border-strong); }
+			.theme-toggle .icon.sun { display: none; }
+			.theme-toggle .icon.moon { display: block; }
+			[data-theme="light"] .theme-toggle .icon.sun { display: block; }
+			[data-theme="light"] .theme-toggle .icon.moon { display: none; }
+
+			.hero { padding: 64px 0 32px; max-width: 760px; }
+			.pill {
+				display: inline-block; padding: 4px 10px; border: 1px solid var(--border);
+				border-radius: 999px; font-size: 12px; color: var(--text-muted); background: var(--bg-elev);
+			}
+			h1 {
+				font-size: clamp(34px, 5vw, 54px); line-height: 1.05; letter-spacing: -0.025em;
+				margin: 14px 0 14px; font-weight: 700;
+			}
+			.hero p { color: var(--text-muted); font-size: 17px; max-width: 580px; margin: 0 0 26px; }
+			.cta { display: flex; gap: 10px; flex-wrap: wrap; }
+			.btn {
+				display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px;
+				border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.15s;
+				cursor: pointer; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
+			}
+			.btn:hover { border-color: var(--border-strong); text-decoration: none; }
+			.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+			.btn.primary:hover { filter: brightness(1.1); }
+
+			section { padding: 36px 0; }
+			h2 { font-size: 22px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+			.sub { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
+
+			.card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+
+			.demo-grid { display: grid; grid-template-columns: 320px 1fr; gap: 18px; align-items: start; }
+			@media (max-width: 820px) { .demo-grid { grid-template-columns: 1fr; } }
+
+			.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+			.field label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+			.field input, .field select {
+				background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
+				padding: 8px 10px; border-radius: 6px; font: inherit; font-size: 14px;
+			}
+			.field input:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+			.preview .url {
+				margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--text-muted);
+				background: var(--bg-elev-2); border: 1px solid var(--border); padding: 8px 10px;
+				border-radius: 6px; word-break: break-all;
+			}
+			.preview .url strong { color: var(--text); font-weight: 500; }
+
+			.posts { display: flex; flex-direction: column; gap: 12px; }
+			.post {
+				display: flex; gap: 12px; padding: 12px; background: var(--bg-elev-2);
+				border: 1px solid var(--border); border-radius: 8px;
+			}
+			.post-cover {
+				flex: 0 0 96px; height: 64px; border-radius: 6px; overflow: hidden;
+				background: linear-gradient(135deg, var(--accent-glow), rgba(247,120,186,0.15));
+				display: flex; align-items: center; justify-content: center;
+				font-size: 22px;
+			}
+			.post-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+			.post-body { flex: 1; min-width: 0; }
+			.post-title { font-weight: 600; font-size: 14px; line-height: 1.3; margin: 0 0 4px; color: var(--text); }
+			.post-title a { color: inherit; }
+			.post-brief { font-size: 12px; color: var(--text-muted); margin: 0 0 6px; line-height: 1.4; max-height: 2.8em; overflow: hidden; }
+			.post-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
+			.post-meta .tag { padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px; }
+
+			pre.markdown {
+				margin: 12px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px;
+				background: var(--bg-elev-2); color: var(--text); font-family: var(--mono); font-size: 12px;
+				line-height: 1.5; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+			}
+
+			.copy-btn { margin-top: 8px; font-size: 12px; padding: 6px 10px; }
+
+			.examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+			.example { padding: 14px; }
+			.example .label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+			.example .host {
+				font-family: var(--mono); font-size: 13px; color: var(--text); display: block; margin: 4px 0 8px;
+			}
+			.example button { width: 100%; }
+
+			.status {
+				margin-top: 8px; padding: 8px 10px; border-radius: 6px; font-size: 12px;
+				border: 1px solid var(--border); background: var(--bg-elev-2); color: var(--text-muted);
+			}
+			.status.error { border-color: #f85149; color: #f85149; }
+			.status.loading { color: var(--accent); }
+
+			footer.site {
+				margin-top: 40px; padding: 32px 0; border-top: 1px solid var(--border);
+				color: var(--text-muted); font-size: 13px;
+				display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+			}
+			.icon { width: 16px; height: 16px; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<header class="site">
+				<div class="logo">
+					<span class="dot"></span>
+					<span>Blog Post Workflow</span>
+				</div>
+				<nav class="site">
+					<a href="#demo">Demo</a>
+					<a href="#examples">Examples</a>
+					<a href="https://github.com/codenificient/blog-post-workflow" target="_blank" rel="noopener">GitHub</a>
+					<button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+						<svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<circle cx="12" cy="12" r="4" />
+							<path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+						</svg>
+						<svg class="icon moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+						</svg>
+					</button>
+				</nav>
+			</header>
+
+			<section class="hero">
+				<span class="pill">GitHub Action · Self-hosted demo on Kubernetes</span>
+				<h1>Latest blog posts,<br />pinned to your README.</h1>
+				<p>
+					A GitHub Action that pulls your latest Hashnode (or any RSS feed) posts and
+					rewrites the marker block in your README on a schedule. No more manually
+					updating your portfolio every time you publish.
+				</p>
+				<div class="cta">
+					<a class="btn primary" href="#demo">Try it live</a>
+					<a class="btn" href="https://github.com/codenificient/blog-post-workflow" target="_blank" rel="noopener">View on GitHub</a>
+				</div>
+			</section>
+
+			<section id="demo">
+				<h2>Try it</h2>
+				<p class="sub">
+					Type a Hashnode publication host (custom domain or
+					<code>username.hashnode.dev</code>). The preview and README markdown
+					update live.
+				</p>
+				<div class="demo-grid">
+					<form class="card controls" id="form">
+						<div class="field">
+							<label for="host">Hashnode host</label>
+							<input id="host" name="host" type="text" value="blog.tioye.dev" autocomplete="off" spellcheck="false" />
+						</div>
+						<div class="field">
+							<label for="max">Posts</label>
+							<select id="max" name="max">
+								<option value="3">3</option>
+								<option value="5" selected>5</option>
+								<option value="8">8</option>
+								<option value="10">10</option>
+								<option value="15">15</option>
+							</select>
+						</div>
+						<button type="button" class="btn primary" id="loadBtn">Fetch posts</button>
+						<div class="status" id="status">Idle.</div>
+					</form>
+					<div class="card preview">
+						<div id="postsContainer" class="posts"></div>
+						<div style="margin-top: 14px;">
+							<div style="font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px;">README markdown the Action would write:</div>
+							<pre class="markdown" id="markdownOut">— run the demo to see output —</pre>
+							<button type="button" class="btn copy-btn" id="copyBtn">Copy markdown</button>
+						</div>
+						<div class="url" style="margin-top: 12px;">
+							<strong>API:</strong> <span id="apiUrl">/api/preview?host=…&amp;max=…</span>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section id="examples">
+				<h2>Examples</h2>
+				<p class="sub">Click any host below to load its latest posts into the demo above.</p>
+				<div class="examples">
+					<div class="card example">
+						<span class="label">Personal blog</span>
+						<span class="host">blog.tioye.dev</span>
+						<button type="button" class="btn" data-host="blog.tioye.dev">Load</button>
+					</div>
+					<div class="card example">
+						<span class="label">Hashnode default</span>
+						<span class="host">codenificient.hashnode.dev</span>
+						<button type="button" class="btn" data-host="codenificient.hashnode.dev">Load</button>
+					</div>
+					<div class="card example">
+						<span class="label">Hashnode engineering</span>
+						<span class="host">engineering.hashnode.com</span>
+						<button type="button" class="btn" data-host="engineering.hashnode.com">Load</button>
+					</div>
+				</div>
+			</section>
+
+			<section id="usage">
+				<h2>Drop it in your repo</h2>
+				<p class="sub">Add this workflow to <code>.github/workflows/blog-post-workflow.yml</code> and put the marker comments in your README.</p>
+				<pre class="markdown" style="white-space: pre;"><code>name: Latest blog post workflow
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: codenificient/blog-post-workflow@v1
+        with:
+          hashnode_api_key: ${{ secrets.HASHNODE_API_KEY }}
+          github_username: 'your-github-username'</code></pre>
+			</section>
+
+			<footer class="site">
+				<div>
+					Forked from
+					<a href="https://github.com/gautamkrishnar/blog-post-workflow" target="_blank" rel="noopener">gautamkrishnar/blog-post-workflow</a>
+					— MIT License.
+				</div>
+				<div>
+					<a href="/api/health">/api/health</a>
+				</div>
+			</footer>
+		</div>
+
+		<script>
+			const $ = (id) => document.getElementById(id);
+			const themeToggle = $("themeToggle");
+			themeToggle.addEventListener("click", () => {
+				const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+				document.documentElement.dataset.theme = next;
+				try { localStorage.setItem("theme", next); } catch (e) {}
+			});
+
+			const hostInput = $("host");
+			const maxSelect = $("max");
+			const loadBtn = $("loadBtn");
+			const status = $("status");
+			const postsContainer = $("postsContainer");
+			const markdownOut = $("markdownOut");
+			const apiUrlSpan = $("apiUrl");
+			const copyBtn = $("copyBtn");
+
+			function fmtDate(iso) {
+				if (!iso) return "";
+				const d = new Date(iso);
+				return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+			}
+			function escapeHtml(s) {
+				return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+			}
+
+			async function loadPosts() {
+				const host = hostInput.value.trim();
+				const max = maxSelect.value;
+				if (!host) {
+					status.textContent = "Enter a Hashnode host first.";
+					status.className = "status error";
+					return;
+				}
+				const url = "/api/preview?host=" + encodeURIComponent(host) + "&max=" + encodeURIComponent(max);
+				apiUrlSpan.textContent = url;
+				status.textContent = "Fetching " + host + "…";
+				status.className = "status loading";
+				postsContainer.innerHTML = "";
+				try {
+					const res = await fetch(url);
+					const body = await res.json();
+					if (!res.ok) {
+						status.textContent = body.error || ("HTTP " + res.status);
+						status.className = "status error";
+						markdownOut.textContent = "— error —";
+						return;
+					}
+					const posts = body.posts || [];
+					if (posts.length === 0) {
+						status.textContent = "No posts found for " + host + ".";
+						status.className = "status";
+						markdownOut.textContent = "— no posts —";
+						return;
+					}
+					status.textContent = "Loaded " + posts.length + " post(s) from " + (body.publication && body.publication.title || host) + ".";
+					status.className = "status";
+					postsContainer.innerHTML = posts.map((p) => {
+						const cover = p.coverImage && p.coverImage.url
+							? '<img src="' + escapeHtml(p.coverImage.url) + '" alt="" loading="lazy" />'
+							: '📝';
+						const tags = (p.tags || []).slice(0, 2).map((t) =>
+							'<span class="tag">' + escapeHtml(t.name) + '</span>'
+						).join("");
+						const meta = [
+							fmtDate(p.publishedAt),
+							p.readTimeInMinutes ? p.readTimeInMinutes + " min read" : null,
+							tags
+						].filter(Boolean).join(" · ");
+						return ''
+							+ '<div class="post">'
+							+ '<div class="post-cover">' + cover + '</div>'
+							+ '<div class="post-body">'
+							+   '<div class="post-title"><a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">' + escapeHtml(p.title) + '</a></div>'
+							+   (p.brief ? '<div class="post-brief">' + escapeHtml(p.brief) + '</div>' : '')
+							+   '<div class="post-meta">' + meta + '</div>'
+							+ '</div>'
+							+ '</div>';
+					}).join("");
+					markdownOut.textContent = body.markdown || "";
+				} catch (err) {
+					status.textContent = "Network error: " + (err && err.message || err);
+					status.className = "status error";
+				}
+			}
+
+			loadBtn.addEventListener("click", loadPosts);
+			hostInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); loadPosts(); } });
+
+			document.querySelectorAll('[data-host]').forEach((btn) => {
+				btn.addEventListener('click', () => {
+					hostInput.value = btn.getAttribute('data-host');
+					loadPosts();
+				});
+			});
+
+			copyBtn.addEventListener("click", async () => {
+				try {
+					await navigator.clipboard.writeText(markdownOut.textContent);
+					copyBtn.textContent = "Copied!";
+					setTimeout(() => (copyBtn.textContent = "Copy markdown"), 1500);
+				} catch (e) {
+					copyBtn.textContent = "Copy failed";
+					setTimeout(() => (copyBtn.textContent = "Copy markdown"), 1500);
+				}
+			});
+
+			// Auto-run on load with the default host
+			loadPosts();
+		</script>
+	</body>
+</html>

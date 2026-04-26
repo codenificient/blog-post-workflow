@@ -38,6 +38,7 @@
     "dateformat": "^3.0.3",
     "dotenv": "^16.4.5",
     "esbuild": "^0.25.2",
+    "express": "^4.21.1",
     "keepalive-workflow": "^2.0.9",
     "node-fetch": "^2.7.0",
     "process": "latest",
