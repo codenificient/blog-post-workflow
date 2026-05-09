@@ -35,7 +35,7 @@
   "homepage": "https://github.com/gautamkrishnar/blog-post-workflow#readme",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "dateformat": "^3.0.3",
+    "dateformat": "^5.0.0",
     "dotenv": "^16.4.5",
     "esbuild": "^0.25.2",
     "express": "^4.21.1",
