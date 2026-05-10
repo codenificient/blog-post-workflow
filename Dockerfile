@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:22-alpine
+FROM mirror.gcr.io/library/node:22-alpine
 
 
 # wget is used by the healthcheck below
